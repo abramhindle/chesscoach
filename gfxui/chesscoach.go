@@ -9,6 +9,7 @@ import (
 	"image/draw"
 	_ "image/png"
 	"log"
+	"os/exec"
 
 	"github.com/golang/freetype/truetype"
 	eb "github.com/hajimehoshi/ebiten"
@@ -31,6 +32,7 @@ var (
 	// it's inconvenient to calculate them from just the list of move objects
 	// at the end, as they require building the position at each step
 	moves []string
+	bestMove string
 	eng   *uci.Engine
 	// -- ui state --
 	p0 = chess.NoSquare // player's selected square
@@ -164,6 +166,7 @@ func updateEngine() {
 				fmt.Println(r.BestMoves[0], r.Score)
 		}
 		fmt.Println("bestmove: ", results.BestMove)
+		bestMove = results.BestMove
 		if game.Position().Turn() == chess.Black {
 			addMoveStr(results.BestMove)
 		}
@@ -192,7 +195,22 @@ func addMove(mv *chess.Move) {
 	}
 	updateEngine()
 }
-
+func myRun(prog string, arg string) {
+	cmd := exec.Command(prog, arg)
+	err := cmd.Run()
+	if err != nil {
+	    log.Fatal(err)
+	}
+}
+func mySuccess(arg string) {
+	myRun("./success.sh",arg)
+}
+func myFailure(arg string) {
+	myRun("./failure.sh",arg)
+}
+func myInvalid() {
+	myRun("./invalid.sh","")
+}
 func watchMouse() {
 	if ebi.IsMouseButtonJustPressed(eb.MouseButtonLeft) {
 		ms := mouseSquare()
@@ -203,7 +221,17 @@ func watchMouse() {
 			p0 = chess.NoSquare
 		default:
 			if valid, mv := validMove(p0, ms); valid {
-				addMove(mv)
+				if mv.String() == bestMove {
+					fmt.Println("Adding moving", mv)
+					mySuccess(mv.String())
+					addMove(mv)
+				} else {
+					fmt.Println("Not best move: ", mv)
+					myFailure(mv.String())
+				}
+			} else {
+				fmt.Println("Not valid: ", mv, p0, ms)
+				myInvalid()
 			}
 		}
 	}
